@@ -86,8 +86,23 @@ class HallucinationScorer:
 
         return self._threshold
 
-    def faithfulness_score(self, context: str, response: str) -> FaithfulnessResult:
+    @property
+    def embedding_model(self) -> EmbeddingModel:
+        """Expose underlying embedding backend for controlled reuse."""
+
+        return self._model
+
+    def faithfulness_score(
+        self,
+        context: str,
+        response: str,
+        threshold: float | None = None,
+    ) -> FaithfulnessResult:
         """Score how well a response is grounded in the given context."""
+
+        active_threshold = self._threshold if threshold is None else float(threshold)
+        if active_threshold < 0.0 or active_threshold > 1.0:
+            raise ValueError("threshold must be between 0 and 1")
 
         context_sentences = _split_sentences(context)
         response_sentences = _split_sentences(response)
@@ -96,7 +111,7 @@ class HallucinationScorer:
             return FaithfulnessResult(
                 score=0.0,
                 verdict="hallucinated",
-                threshold=self._threshold,
+                threshold=active_threshold,
                 sentence_scores=[],
             )
 
@@ -105,7 +120,7 @@ class HallucinationScorer:
             return FaithfulnessResult(
                 score=0.0,
                 verdict="hallucinated",
-                threshold=self._threshold,
+                threshold=active_threshold,
                 sentence_scores=empty_scores,
             )
 
@@ -125,14 +140,26 @@ class HallucinationScorer:
         ]
 
         score = float(np.clip(np.mean(max_similarities), 0.0, 1.0))
-        verdict = "faithful" if score >= self._threshold else "hallucinated"
+        verdict = "faithful" if score >= active_threshold else "hallucinated"
 
         return FaithfulnessResult(
             score=score,
             verdict=verdict,
-            threshold=self._threshold,
+            threshold=active_threshold,
             sentence_scores=sentence_scores,
         )
+
+    def batch_faithfulness_scores(
+        self,
+        pairs: Sequence[tuple[str, str]],
+        threshold: float | None = None,
+    ) -> list[FaithfulnessResult]:
+        """Score multiple context-response pairs in order using shared model backend."""
+
+        return [
+            self.faithfulness_score(context=context, response=response, threshold=threshold)
+            for context, response in pairs
+        ]
 
 
 def _load_default_model(model_name: str) -> EmbeddingModel:

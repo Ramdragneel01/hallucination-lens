@@ -5,23 +5,27 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hallucination-lens"
-version = "0.1.0"
+version = "0.2.0"
 description = "Context-grounded hallucination detection for RAG responses"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
   { name = "Ram Prakash" }
 ]
-license = { text = "MIT" }
+license = "MIT"
 dependencies = [
   "sentence-transformers==3.0.1",
   "torch==2.3.1",
-  "langchain==0.2.14",
-  "numpy==1.26.4"
+  "numpy==1.26.4",
+  "fastapi==0.116.1",
+  "uvicorn==0.35.0",
+  "prometheus-client==0.23.1",
+  "pydantic==2.11.7"
 ]
 
 [project.scripts]
 hallucination-lens = "hallucination_lens.cli:main"
+hallucination-lens-api = "hallucination_lens.api:run"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

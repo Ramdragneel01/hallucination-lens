@@ -79,3 +79,33 @@ def test_threshold_changes_verdict():
 
     assert result.score < 0.95
     assert result.verdict == "hallucinated"
+
+
+def test_batch_scoring_preserves_input_order_and_returns_results():
+    """Batch scoring should return one result per pair in original order."""
+
+    scorer = HallucinationScorer(model=FakeEmbeddingModel(), threshold=0.6)
+    results = scorer.batch_faithfulness_scores(
+        pairs=[
+            ("Paris is the capital of France.", "Paris is in France."),
+            ("Paris is the capital of France.", "Berlin is in Germany."),
+        ]
+    )
+
+    assert len(results) == 2
+    assert results[0].verdict == "faithful"
+    assert results[1].verdict == "hallucinated"
+
+
+def test_threshold_override_applies_without_mutating_default_threshold():
+    """Per-call threshold override should not mutate scorer default threshold."""
+
+    scorer = HallucinationScorer(model=FakeEmbeddingModel(), threshold=0.6)
+    result = scorer.faithfulness_score(
+        context="Paris is the capital of France.",
+        response="Paris is in France. The ocean is blue.",
+        threshold=0.95,
+    )
+
+    assert result.threshold == 0.95
+    assert scorer.threshold == 0.6
