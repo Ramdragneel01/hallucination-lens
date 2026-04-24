@@ -33,3 +33,9 @@ class InMemoryRateLimiter:
 
             queue.append(now)
         return True
+
+    def clear(self) -> None:
+        """Clear limiter state for deterministic tests and maintenance operations."""
+
+        with self._lock:
+            self._store.clear()

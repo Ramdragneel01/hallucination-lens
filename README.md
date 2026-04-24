@@ -81,6 +81,11 @@ Endpoints:
 3. `POST /batch`
 4. `GET /metrics`
 
+Optional auth:
+
+1. Set `HALLUCINATION_API_KEY` to require `X-API-Key` on `POST /score` and `POST /batch`.
+2. Keep `GET /health` public for liveness/readiness probes.
+
 Example `POST /score` request:
 
 ```json
@@ -118,6 +123,16 @@ Runtime threshold must remain inside configured governance range:
 2. `MAX_THRESHOLD`
 
 This prevents unsafe threshold drift in production calls.
+
+## Authentication
+
+When `HALLUCINATION_API_KEY` is configured, send this header for protected endpoints:
+
+```http
+X-API-Key: <your-api-key>
+```
+
+`/score` and `/batch` return `401 Unauthorized` when the header is missing or invalid.
 
 ## Validation Commands
 

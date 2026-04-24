@@ -32,7 +32,13 @@
 6. `MAX_CONTEXT_CHARS`
 7. `MAX_RESPONSE_CHARS`
 8. `RATE_LIMIT_PER_MINUTE`
-9. `CORS_ORIGINS`
+9. `HALLUCINATION_API_KEY` (optional; enables `X-API-Key` auth on scoring endpoints)
+10. `CORS_ORIGINS`
+
+## Probe and Endpoint Access
+
+1. Keep `/health` unauthenticated for liveness and readiness probes.
+2. When `HALLUCINATION_API_KEY` is set, require `X-API-Key` for `/score` and `/batch`.
 
 ## Release Pipelines
 

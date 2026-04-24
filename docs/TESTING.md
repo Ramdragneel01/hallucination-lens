@@ -17,6 +17,9 @@ Current integration tests validate:
 2. Single score response shape.
 3. Batch score aggregate fields.
 4. Threshold governance rejection behavior.
+5. API key enforcement for protected endpoints when configured.
+6. Public health access while API key auth is enabled.
+7. Rate-limit rejection behavior (`429`) after quota exhaustion.
 
 ## CLI Coverage
 

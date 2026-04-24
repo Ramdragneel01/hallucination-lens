@@ -3,6 +3,18 @@
 
 Base URL (local): `http://127.0.0.1:8003`
 
+## Authentication
+
+When `HALLUCINATION_API_KEY` is configured, clients must send `X-API-Key` for protected endpoints:
+
+1. `POST /score`
+2. `POST /batch`
+
+Public endpoints remain unauthenticated:
+
+1. `GET /health`
+2. `GET /metrics`
+
 ## GET /health
 
 Returns runtime diagnostics.
@@ -18,6 +30,9 @@ Response fields:
 ## POST /score
 
 Scores one context-response pair.
+
+Headers (when API key is configured):
+1. `X-API-Key`
 
 Request body:
 1. `context`
@@ -36,6 +51,9 @@ Response fields:
 ## POST /batch
 
 Scores multiple pairs in one request.
+
+Headers (when API key is configured):
+1. `X-API-Key`
 
 Request body:
 1. `items` array of `{ context, response }`
@@ -60,3 +78,8 @@ Prometheus metrics endpoint.
 Error payload fields:
 1. `detail`
 2. `request_id`
+
+Common status codes:
+1. `401` for missing/invalid `X-API-Key` when API auth is enabled.
+2. `422` for invalid payload or threshold governance violations.
+3. `429` when request rate exceeds configured minute quota.

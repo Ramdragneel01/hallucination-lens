@@ -25,6 +25,12 @@ jobs:
           pip install -r requirements-dev.txt
           pip install -e .
 
+      - name: Dependency audit (non-blocking)
+        continue-on-error: true
+        run: |
+          pip install pip-audit
+          pip-audit
+
       - name: Lint
         run: ruff check src tests
 

@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from fastapi.testclient import TestClient
+import pytest
 
 from hallucination_lens import api
 from hallucination_lens.scorer import FaithfulnessResult, SentenceScore
@@ -49,6 +52,24 @@ def _client_with_fake_scorer(monkeypatch):
 
     monkeypatch.setattr(api, "get_scorer", lambda: FakeScorer())
     return TestClient(api.app)
+
+
+def _override_settings(monkeypatch, **changes):
+    """Apply temporary runtime settings overrides for API security tests."""
+
+    monkeypatch.setattr(api, "settings", replace(api.settings, **changes))
+
+
+@pytest.fixture(autouse=True)
+def reset_runtime_state(monkeypatch):
+    """Reset limiter and auth controls between tests for deterministic behavior."""
+
+    api.limiter.clear()
+    _override_settings(monkeypatch, api_key="", rate_limit_per_minute=120)
+
+    yield
+
+    api.limiter.clear()
 
 
 def test_health_endpoint_exposes_limits_and_version(monkeypatch):
@@ -130,3 +151,69 @@ def test_batch_threshold_outside_governance_is_rejected(monkeypatch):
 
     assert response.status_code == 422
     assert "governance limits" in response.json()["detail"]
+
+
+def test_score_requires_api_key_when_configured(monkeypatch):
+    """Score endpoint should require API key when runtime key is configured."""
+
+    client = _client_with_fake_scorer(monkeypatch)
+    _override_settings(monkeypatch, api_key="secret-key")
+
+    unauthorized = client.post(
+        "/score",
+        json={
+            "context": "Paris is the capital of France.",
+            "response": "Paris is in France.",
+            "threshold": 0.6,
+        },
+    )
+    assert unauthorized.status_code == 401
+
+    authorized = client.post(
+        "/score",
+        headers={"X-API-Key": "secret-key"},
+        json={
+            "context": "Paris is the capital of France.",
+            "response": "Paris is in France.",
+            "threshold": 0.6,
+        },
+    )
+    assert authorized.status_code == 200
+
+
+def test_health_is_public_when_api_key_enabled(monkeypatch):
+    """Health endpoint should remain public for probes."""
+
+    client = _client_with_fake_scorer(monkeypatch)
+    _override_settings(monkeypatch, api_key="secret-key")
+
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
+def test_score_rate_limit_returns_429(monkeypatch):
+    """Score endpoint should return 429 once request quota is exceeded."""
+
+    client = _client_with_fake_scorer(monkeypatch)
+    _override_settings(monkeypatch, rate_limit_per_minute=1)
+
+    first = client.post(
+        "/score",
+        json={
+            "context": "Paris is the capital of France.",
+            "response": "Paris is in France.",
+            "threshold": 0.6,
+        },
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/score",
+        json={
+            "context": "Paris is the capital of France.",
+            "response": "Paris is in France.",
+            "threshold": 0.6,
+        },
+    )
+    assert second.status_code == 429
