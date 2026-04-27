@@ -84,6 +84,30 @@ def test_health_endpoint_exposes_limits_and_version(monkeypatch):
     assert payload["max_batch_items"] > 0
 
 
+def test_live_endpoint_reports_alive(monkeypatch):
+    """Live endpoint should confirm process liveness for orchestrators."""
+
+    client = _client_with_fake_scorer(monkeypatch)
+    response = client.get("/live")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "alive"
+    assert "timestamp" in payload
+
+
+def test_ready_endpoint_reports_model_loaded(monkeypatch):
+    """Ready endpoint should confirm model backend is available for traffic."""
+
+    client = _client_with_fake_scorer(monkeypatch)
+    response = client.get("/ready")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ready"
+    assert payload["model_loaded"] is True
+
+
 def test_score_endpoint_returns_contract(monkeypatch):
     """Single score endpoint should return verdict and sentence-level evidence."""
 
@@ -217,3 +241,35 @@ def test_score_rate_limit_returns_429(monkeypatch):
         },
     )
     assert second.status_code == 429
+
+
+def test_metrics_requires_api_key_when_configured(monkeypatch):
+    """Metrics endpoint should enforce optional API key when configured."""
+
+    client = _client_with_fake_scorer(monkeypatch)
+    _override_settings(monkeypatch, metrics_api_key="metrics-secret")
+
+    unauthorized = client.get("/metrics")
+    assert unauthorized.status_code == 401
+
+    authorized = client.get("/metrics", headers={"X-API-Key": "metrics-secret"})
+    assert authorized.status_code == 200
+
+
+def test_score_rejects_payload_above_max_request_bytes(monkeypatch):
+    """Request middleware should reject oversized payloads before route handling."""
+
+    client = _client_with_fake_scorer(monkeypatch)
+    _override_settings(monkeypatch, max_request_bytes=100)
+
+    response = client.post(
+        "/score",
+        json={
+            "context": "Paris is the capital of France." * 5,
+            "response": "Paris is in France." * 5,
+            "threshold": 0.6,
+        },
+    )
+
+    assert response.status_code == 413
+    assert "MAX_REQUEST_BYTES" in response.json()["detail"]

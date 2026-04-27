@@ -3,16 +3,19 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from time import perf_counter
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel, Field
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .config import Settings, get_settings
 from .rate_limit import InMemoryRateLimiter
@@ -94,6 +97,14 @@ class HealthResponse(BaseModel):
     max_batch_items: int
 
 
+class ReadinessResponse(BaseModel):
+    """Readiness payload signaling whether model backend is available."""
+
+    status: str
+    timestamp: str
+    model_loaded: bool
+
+
 settings = get_settings()
 limiter = InMemoryRateLimiter(window_seconds=60)
 _scorer: HallucinationScorer | None = None
@@ -121,12 +132,29 @@ VERDICT_COUNTER = Counter(
 )
 
 
-app = FastAPI(title=settings.app_name, version=settings.app_version)
+@asynccontextmanager
+async def app_lifespan(_: FastAPI):
+    """Run startup tasks like optional model preloading before serving requests."""
+
+    if settings.preload_model_on_startup:
+        get_scorer()
+    yield
+
+
+app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=app_lifespan)
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=settings.allowed_hosts,
+)
+app.add_middleware(
+    GZipMiddleware,
+    minimum_size=1024,
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -178,6 +206,27 @@ def _require_api_key(
 AuthDep = Annotated[None, Depends(_require_api_key)]
 
 
+def _apply_security_headers(response: Response, request: Request) -> None:
+    """Apply hardened HTTP headers to reduce browser-based attack surface."""
+
+    if not settings.secure_headers_enabled:
+        return
+
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Cross-Origin-Resource-Policy"] = "same-site"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+    )
+
+    if request.url.scheme == "https" and settings.hsts_max_age_seconds > 0:
+        response.headers["Strict-Transport-Security"] = (
+            f"max-age={settings.hsts_max_age_seconds}; includeSubDomains"
+        )
+
+
 @app.middleware("http")
 async def request_context_middleware(request: Request, call_next):
     """Attach request id, security headers, and request-level metrics."""
@@ -185,21 +234,43 @@ async def request_context_middleware(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID", str(uuid4()))
     request.state.request_id = request_id
     started_at = perf_counter()
+    content_length = request.headers.get("Content-Length")
 
-    response = await call_next(request)
+    if content_length is not None:
+        try:
+            if int(content_length) > settings.max_request_bytes:
+                response = JSONResponse(
+                    status_code=413,
+                    content={
+                        "detail": (
+                            "payload exceeds MAX_REQUEST_BYTES "
+                            f"({settings.max_request_bytes})"
+                        ),
+                        "request_id": request_id,
+                    },
+                )
+            else:
+                response = await call_next(request)
+        except ValueError:
+            response = JSONResponse(
+                status_code=400,
+                content={"detail": "Invalid Content-Length header", "request_id": request_id},
+            )
+    else:
+        response = await call_next(request)
 
     REQUEST_COUNTER.labels(
         method=request.method,
         endpoint=request.url.path,
         status=str(response.status_code),
     ).inc()
-    REQUEST_LATENCY.labels(method=request.method, endpoint=request.url.path).observe(perf_counter() - started_at)
+    REQUEST_LATENCY.labels(
+        method=request.method,
+        endpoint=request.url.path,
+    ).observe(perf_counter() - started_at)
 
     response.headers["X-Request-ID"] = request_id
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    _apply_security_headers(response=response, request=request)
     return response
 
 
@@ -224,6 +295,32 @@ def health() -> HealthResponse:
         model_name=settings.model_name,
         default_threshold=settings.default_threshold,
         max_batch_items=settings.max_batch_items,
+    )
+
+
+@app.get("/live")
+def live() -> dict[str, str]:
+    """Return process liveness status for orchestration health checks."""
+
+    return {
+        "status": "alive",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/ready", response_model=ReadinessResponse)
+def ready() -> ReadinessResponse:
+    """Return model readiness status and fail with 503 when backend cannot initialize."""
+
+    try:
+        scorer = get_scorer()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"model backend not ready: {exc}") from exc
+
+    return ReadinessResponse(
+        status="ready",
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        model_loaded=scorer is not None,
     )
 
 
@@ -345,9 +442,11 @@ def batch_score(request: Request, payload: BatchScoreRequest, _: AuthDep = None)
 
 
 @app.get("/metrics")
-def metrics() -> PlainTextResponse:
+def metrics(x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None) -> PlainTextResponse:
     """Expose Prometheus metrics for scoring service observability."""
 
+    if settings.metrics_api_key and x_api_key != settings.metrics_api_key:
+        raise HTTPException(status_code=401, detail="Unauthorized")
     return PlainTextResponse(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
@@ -356,4 +455,12 @@ def run() -> None:
 
     import uvicorn
 
-    uvicorn.run("hallucination_lens.api:app", host="0.0.0.0", port=8003, reload=False)
+    uvicorn.run(
+        "hallucination_lens.api:app",
+        host=settings.host,
+        port=settings.port,
+        reload=False,
+        workers=settings.web_concurrency,
+        proxy_headers=True,
+        forwarded_allow_ips="*",
+    )
