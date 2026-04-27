@@ -7,8 +7,10 @@
    - `pip install -r requirements.txt`
    - `pip install -e .`
 2. Start API:
-   - `uvicorn hallucination_lens.api:app --host 0.0.0.0 --port 8003`
+   - `hallucination-lens-api`
 3. Validate endpoints:
+   - `/live`
+   - `/ready`
    - `/health`
    - `/score`
    - `/batch`
@@ -21,6 +23,9 @@
 2. Validate:
    - API at `http://127.0.0.1:8003`
    - Prometheus at `http://127.0.0.1:9093`
+3. Verify API container health:
+   - `docker compose ps`
+   - API should report healthy after model initialization.
 
 ## Environment Variables
 
@@ -33,12 +38,30 @@
 7. `MAX_RESPONSE_CHARS`
 8. `RATE_LIMIT_PER_MINUTE`
 9. `HALLUCINATION_API_KEY` (optional; enables `X-API-Key` auth on scoring endpoints)
-10. `CORS_ORIGINS`
+10. `METRICS_API_KEY` (optional; enables `X-API-Key` auth on `/metrics`)
+11. `CORS_ORIGINS`
+12. `ALLOWED_HOSTS` (set explicit hostnames in production)
+13. `MAX_REQUEST_BYTES`
+14. `SECURE_HEADERS_ENABLED`
+15. `HSTS_MAX_AGE_SECONDS` (effective on HTTPS traffic)
+16. `PRELOAD_MODEL_ON_STARTUP`
+17. `HOST`
+18. `PORT`
+19. `WEB_CONCURRENCY`
 
 ## Probe and Endpoint Access
 
-1. Keep `/health` unauthenticated for liveness and readiness probes.
-2. When `HALLUCINATION_API_KEY` is set, require `X-API-Key` for `/score` and `/batch`.
+1. Use `/live` for liveness probes and `/ready` for readiness probes.
+2. Keep `/live`, `/ready`, and `/health` unauthenticated.
+3. When `HALLUCINATION_API_KEY` is set, require `X-API-Key` for `/score` and `/batch`.
+4. When `METRICS_API_KEY` is set, require `X-API-Key` for `/metrics`.
+
+## Production Recommendations
+
+1. Set `ALLOWED_HOSTS` to your API domain names instead of `*`.
+2. Enable HTTPS at the ingress/load balancer so HSTS can be applied.
+3. Use `PRELOAD_MODEL_ON_STARTUP=true` in orchestrated environments for stable readiness.
+4. Keep `WEB_CONCURRENCY` aligned to available CPU and memory; each worker loads the model.
 
 ## Release Pipelines
 

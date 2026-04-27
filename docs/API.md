@@ -12,8 +12,29 @@ When `HALLUCINATION_API_KEY` is configured, clients must send `X-API-Key` for pr
 
 Public endpoints remain unauthenticated:
 
-1. `GET /health`
-2. `GET /metrics`
+1. `GET /live`
+2. `GET /ready`
+3. `GET /health`
+4. `GET /metrics` (unless `METRICS_API_KEY` is configured)
+
+When `METRICS_API_KEY` is configured, `GET /metrics` also requires `X-API-Key`.
+
+## GET /live
+
+Returns process liveness status.
+
+Response fields:
+1. `status`
+2. `timestamp`
+
+## GET /ready
+
+Returns model backend readiness status. If model backend cannot initialize, this endpoint returns `503`.
+
+Response fields:
+1. `status`
+2. `timestamp`
+3. `model_loaded`
 
 ## GET /health
 
@@ -73,6 +94,9 @@ Response fields:
 
 Prometheus metrics endpoint.
 
+Headers (when metrics API key is configured):
+1. `X-API-Key`
+
 ## Error Contract
 
 Error payload fields:
@@ -81,5 +105,8 @@ Error payload fields:
 
 Common status codes:
 1. `401` for missing/invalid `X-API-Key` when API auth is enabled.
-2. `422` for invalid payload or threshold governance violations.
-3. `429` when request rate exceeds configured minute quota.
+2. `400` for malformed `Content-Length` headers.
+3. `413` for payloads above `MAX_REQUEST_BYTES`.
+4. `422` for invalid payload or threshold governance violations.
+5. `429` when request rate exceeds configured minute quota.
+6. `503` when model backend is not ready.

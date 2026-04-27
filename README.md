@@ -7,8 +7,8 @@ Production-ready scoring service for detecting RAG hallucinations via context-gr
 
 1. Library scorer for sentence-level faithfulness scoring.
 2. Batch scoring support in both library and CLI.
-3. FastAPI service wrapper with `/health`, `/score`, `/batch`, and `/metrics`.
-4. Threshold governance controls and request rate limiting.
+3. FastAPI service wrapper with `/live`, `/ready`, `/health`, `/score`, `/batch`, and `/metrics`.
+4. Threshold governance controls, request size/rate limiting, and optional endpoint auth.
 5. Prometheus metrics and container deployment artifacts.
 6. CI quality gates and release pipelines for package and container images.
 7. Governance and operations documentation baseline.
@@ -76,15 +76,18 @@ uvicorn hallucination_lens.api:app --host 0.0.0.0 --port 8003 --reload
 
 Endpoints:
 
-1. `GET /health`
-2. `POST /score`
-3. `POST /batch`
-4. `GET /metrics`
+1. `GET /live`
+2. `GET /ready`
+3. `GET /health`
+4. `POST /score`
+5. `POST /batch`
+6. `GET /metrics`
 
 Optional auth:
 
 1. Set `HALLUCINATION_API_KEY` to require `X-API-Key` on `POST /score` and `POST /batch`.
-2. Keep `GET /health` public for liveness/readiness probes.
+2. Set `METRICS_API_KEY` to require `X-API-Key` on `GET /metrics`.
+3. Keep `GET /live`, `GET /ready`, and `GET /health` public for probes.
 
 Example `POST /score` request:
 
@@ -124,6 +127,14 @@ Runtime threshold must remain inside configured governance range:
 
 This prevents unsafe threshold drift in production calls.
 
+## Production Runtime Controls
+
+1. `ALLOWED_HOSTS` constrains accepted `Host` headers (default `*`; set explicitly in production).
+2. `MAX_REQUEST_BYTES` rejects oversized requests before application parsing.
+3. `SECURE_HEADERS_ENABLED` and `HSTS_MAX_AGE_SECONDS` enforce hardened HTTP response headers.
+4. `PRELOAD_MODEL_ON_STARTUP=true` shifts model load cost to startup for safer readiness checks.
+5. `HOST`, `PORT`, and `WEB_CONCURRENCY` control process binding and worker count.
+
 ## Authentication
 
 When `HALLUCINATION_API_KEY` is configured, send this header for protected endpoints:
@@ -152,6 +163,12 @@ Local endpoints:
 
 1. API: http://127.0.0.1:8003
 2. Prometheus: http://127.0.0.1:9093
+
+Container defaults include:
+
+1. Image health check against `/health`.
+2. `tini` as PID 1 for cleaner signal handling and shutdown.
+3. `restart: unless-stopped` in compose for basic process resilience.
 
 ## Documentation
 
