@@ -3,7 +3,7 @@
 
 import numpy as np
 
-from hallucination_lens.scorer import HallucinationScorer
+from hallucination_lens.scorer import FaithfulnessResult, HallucinationScorer, SentenceScore
 
 
 class FakeEmbeddingModel:
@@ -109,3 +109,65 @@ def test_threshold_override_applies_without_mutating_default_threshold():
 
     assert result.threshold == 0.95
     assert scorer.threshold == 0.6
+
+
+def test_empty_response_returns_zero_and_no_sentence_evidence():
+    """Empty response should return hallucinated verdict with no sentence scores."""
+
+    scorer = HallucinationScorer(model=FakeEmbeddingModel(), threshold=0.6)
+    result = scorer.faithfulness_score(
+        context="Paris is the capital of France.",
+        response="   ",
+    )
+
+    assert result.score == 0.0
+    assert result.verdict == "hallucinated"
+    assert result.sentence_scores == []
+
+
+def test_constructor_rejects_threshold_outside_closed_interval():
+    """Constructor should reject thresholds outside the [0, 1] interval."""
+
+    for invalid in (-0.01, 1.01):
+        try:
+            HallucinationScorer(model=FakeEmbeddingModel(), threshold=invalid)
+        except ValueError as exc:
+            assert "threshold" in str(exc)
+        else:  # pragma: no cover - safety branch
+            raise AssertionError("Expected ValueError for invalid threshold")
+
+
+def test_per_call_threshold_override_rejects_invalid_values():
+    """Per-call threshold should validate bounds without mutating scorer state."""
+
+    scorer = HallucinationScorer(model=FakeEmbeddingModel(), threshold=0.6)
+
+    for invalid in (-0.5, 1.2):
+        try:
+            scorer.faithfulness_score(
+                context="Paris is the capital of France.",
+                response="Paris is in France.",
+                threshold=invalid,
+            )
+        except ValueError as exc:
+            assert "threshold" in str(exc)
+        else:  # pragma: no cover - safety branch
+            raise AssertionError("Expected ValueError for invalid threshold override")
+
+
+def test_faithfulness_result_to_dict_preserves_sentence_fields():
+    """Serialization helper should expose score, verdict, threshold, and evidence list."""
+
+    result = FaithfulnessResult(
+        score=0.73,
+        verdict="faithful",
+        threshold=0.6,
+        sentence_scores=[SentenceScore(sentence="Paris is in France.", max_similarity=0.73)],
+    )
+
+    payload = result.to_dict()
+    assert payload["score"] == 0.73
+    assert payload["verdict"] == "faithful"
+    assert payload["threshold"] == 0.6
+    assert payload["sentence_scores"][0]["sentence"] == "Paris is in France."
+    assert payload["sentence_scores"][0]["max_similarity"] == 0.73
