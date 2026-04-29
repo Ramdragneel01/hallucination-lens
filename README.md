@@ -147,3 +147,39 @@ python -m build
 4. `docs/TESTING.md`
 5. `docs/THRESHOLD_CALIBRATION.md`
 6. `docs/BENCHMARKS.md`
+
+## Architecture Snapshot
+
+```mermaid
+flowchart LR
+   Client[Client CLI or API caller] --> API[FastAPI endpoints]
+   Client --> Lib[Python library scorer]
+   API --> Scorer[Sentence similarity scorer]
+   Lib --> Scorer
+   Scorer --> Verdict[Faithful or Hallucinated verdict]
+   Verdict --> Metrics[Metrics and diagnostics]
+```
+
+## Testing
+
+Run validation commands from repository root:
+
+```bash
+ruff check src tests scripts
+pytest -q
+python -m build
+```
+
+Detailed coverage notes: `docs/TESTING.md`.
+
+## Limitations
+
+1. Sentence similarity scoring can miss subtle semantic contradictions that require deeper reasoning.
+2. Benchmark starter datasets are intentionally small and should be extended for domain-specific calibration.
+3. End-to-end API performance depends on model preload and host resource sizing.
+
+## Roadmap
+
+1. Add expanded benchmark suites with multilingual and long-context scenarios.
+2. Add threshold recommendation helpers based on historical false-positive and false-negative outcomes.
+3. Add optional structured export artifacts for CI quality trend dashboards.
