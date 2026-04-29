@@ -172,6 +172,12 @@ python -m build
 
 Detailed coverage notes: `docs/TESTING.md`.
 
+## Week 11 Measured Outcomes
+
+1. Before and after outcomes are documented in `docs/WEEK11_MEASURED_OUTCOMES.md`.
+2. Reliability evidence includes checklist continuity, docs growth, workflow growth, and test-surface increase.
+3. Latency scaling evidence is documented from benchmark runtime results.
+
 ## Limitations
 
 1. Sentence similarity scoring can miss subtle semantic contradictions that require deeper reasoning.
