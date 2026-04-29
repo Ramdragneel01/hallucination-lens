@@ -1,62 +1,62 @@
 [
-  {
-    "id": "sample-001",
-    "context": "Paris is the capital of France. It is in Europe.",
-    "response": "Paris is in France.",
-    "expected_verdict": "faithful"
-  },
-  {
-    "id": "sample-002",
-    "context": "Paris is the capital of France. It is in Europe.",
-    "response": "Berlin is in Germany.",
-    "expected_verdict": "hallucinated"
-  },
-  {
-    "id": "sample-003",
-    "context": "Earth rotates around the Sun once every year.",
-    "response": "Earth completes one orbit around the Sun each year.",
-    "expected_verdict": "faithful"
-  },
-  {
-    "id": "sample-004",
-    "context": "Earth rotates around the Sun once every year.",
-    "response": "Earth has two suns.",
-    "expected_verdict": "hallucinated"
-  },
-  {
-    "id": "sample-005",
-    "context": "The Pacific Ocean is the largest ocean on Earth.",
-    "response": "The Pacific Ocean is the largest ocean.",
-    "expected_verdict": "faithful"
-  },
-  {
-    "id": "sample-006",
-    "context": "The Pacific Ocean is the largest ocean on Earth.",
-    "response": "The Atlantic Ocean is the largest ocean.",
-    "expected_verdict": "hallucinated"
-  },
-  {
-    "id": "sample-007",
-    "context": "FastAPI is a Python framework for building APIs.",
-    "response": "FastAPI helps build Python APIs.",
-    "expected_verdict": "faithful"
-  },
-  {
-    "id": "sample-008",
-    "context": "FastAPI is a Python framework for building APIs.",
-    "response": "FastAPI is a Java database engine.",
-    "expected_verdict": "hallucinated"
-  },
-  {
-    "id": "sample-009",
-    "context": "Redis is an in-memory data store used for caching and messaging.",
-    "response": "Redis is often used for caching.",
-    "expected_verdict": "faithful"
-  },
-  {
-    "id": "sample-010",
-    "context": "Redis is an in-memory data store used for caching and messaging.",
-    "response": "Redis is a front-end CSS library.",
-    "expected_verdict": "hallucinated"
-  }
+    {
+        "id": "sample-001",
+        "context": "Paris is the capital of France. It is in Europe.",
+        "response": "Paris is in France.",
+        "expected_verdict": "faithful"
+    },
+    {
+        "id": "sample-002",
+        "context": "Paris is the capital of France. It is in Europe.",
+        "response": "Berlin is in Germany.",
+        "expected_verdict": "hallucinated"
+    },
+    {
+        "id": "sample-003",
+        "context": "Earth rotates around the Sun once every year.",
+        "response": "Earth completes one orbit around the Sun each year.",
+        "expected_verdict": "faithful"
+    },
+    {
+        "id": "sample-004",
+        "context": "Earth rotates around the Sun once every year.",
+        "response": "Earth has two suns.",
+        "expected_verdict": "hallucinated"
+    },
+    {
+        "id": "sample-005",
+        "context": "The Pacific Ocean is the largest ocean on Earth.",
+        "response": "The Pacific Ocean is the largest ocean.",
+        "expected_verdict": "faithful"
+    },
+    {
+        "id": "sample-006",
+        "context": "The Pacific Ocean is the largest ocean on Earth.",
+        "response": "The Atlantic Ocean is the largest ocean.",
+        "expected_verdict": "hallucinated"
+    },
+    {
+        "id": "sample-007",
+        "context": "FastAPI is a Python framework for building APIs.",
+        "response": "FastAPI helps build Python APIs.",
+        "expected_verdict": "faithful"
+    },
+    {
+        "id": "sample-008",
+        "context": "FastAPI is a Python framework for building APIs.",
+        "response": "FastAPI is a Java database engine.",
+        "expected_verdict": "hallucinated"
+    },
+    {
+        "id": "sample-009",
+        "context": "Redis is an in-memory data store used for caching and messaging.",
+        "response": "Redis is often used for caching.",
+        "expected_verdict": "faithful"
+    },
+    {
+        "id": "sample-010",
+        "context": "Redis is an in-memory data store used for caching and messaging.",
+        "response": "Redis is a front-end CSS library.",
+        "expected_verdict": "hallucinated"
+    }
 ]
