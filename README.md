@@ -2,6 +2,10 @@
 
 Context-grounded hallucination detection for RAG responses using sentence-level embedding similarity.
 
+## Visual Evidence
+
+![hallucination-lens scoring demo](docs/assets/demo-terminal.png)
+
 ## Results
 
 > Replace placeholders with measured numbers from your latest benchmark run.
